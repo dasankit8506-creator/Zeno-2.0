@@ -1,3 +1,4 @@
+<img width="720" height="1323" alt="Screenshot_20261103-000720_1" src="https://github.com/user-attachments/assets/ad729d53-c534-4b3c-88dd-c929f82a45bc" />
 # ZENO AI - Live at zeno20.vercel.app
 
 **Built by Ankit Das | Class 11, Kolkata, India**
