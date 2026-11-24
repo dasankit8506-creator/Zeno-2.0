@@ -369,7 +369,23 @@ export function ZenoChat() {
       ...messages,
       userMessage,
     ];
+// --- IMAGE GENERATION ---
+const lower = messageText.toLowerCase();
+const isImageAsk = lower.includes("make photo") || lower.includes("make image") || lower.includes("generate image") || lower.includes("create image") || lower.includes("make a photo") || lower.includes("create photo");
 
+if (isImageAsk) {
+  const prompt = messageText.replace(/make photo|make image|generate image|create image|make a photo|create photo/gi, "").trim() || "beautiful scenery";
+  const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?nologo=true`;
+  
+  setMessages((prev) => [...prev, {
+    id: makeId("assistant"),
+    role: "assistant",
+    text: `Here is your image! 👇\n\n![photo](${imgUrl})`,
+  }]);
+  setStatus("ready");
+  sendingRef.current = false;
+  return;
+}
     setMessages(updatedMessages);
     setStatus("submitted");
 
@@ -756,7 +772,27 @@ function AssistantMessage({
         <MessageResponse className="zeno-prose">
           {message.text}
         </MessageResponse>
+<MessageResponse className="zeno-prose">
+  {message.text}
+</MessageResponse>
 
+{/* --- PDF BUTTON START --- */}
+<button
+  type="button"
+  onClick={() => {
+    const blob = new Blob([message.text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ZENO-answer.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }}
+  className="mt-2 inline-flex items-center gap-1.5 rounded-full border bg-card/60 px-3 py-1.5 text-xs font-medium"
+>
+  Download as PDF
+</button>
+{/* --- PDF BUTTON END --- */}
       </ChatMessageContent>
 
       <div
