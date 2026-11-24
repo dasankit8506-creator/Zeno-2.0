@@ -1,3 +1,4 @@
+"use client";
 import { useState, useRef } from "react";
 
 export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: string) => void }) {
@@ -9,13 +10,33 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
-      recorder.ondataavailable = (e: any) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.ondataavailable = (e: any) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
-         const transcribe = async (blob: Blob) => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await transcribe(blob);
+      };
+      recorder.start();
+      setRecording(true);
+    } catch {
+      alert("Please allow Mic permission");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      setProcessing(true);
+    }
+  };
+
+  const transcribe = async (blob: Blob) => {
     try {
       const base64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -29,10 +50,33 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
       });
       const data = await res.json();
       setProcessing(false);
-      if (data.text) onVoiceSend(data.text);
-      else alert("Error: " + (data.error || "Could not hear"));
+      if (data.text) {
+        onVoiceSend(data.text);
+      } else {
+        alert("Error: " + (data.error || "Could not hear"));
+      }
     } catch (e: any) {
       setProcessing(false);
       alert("Voice failed: " + e.message);
     }
   };
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (recording) stopRecording();
+        else startRecording();
+      }}
+      style={{
+        padding: "8px 10px",
+        borderRadius: "12px",
+        border: "1px solid #ddd",
+        cursor: "pointer",
+        background: recording ? "#ff4d4d" : processing ? "#ffeaa7" : "white",
+      }}
+    >
+      {recording ? "⏹️ Stop" : processing ? "⏳..." : "🎤"}
+    </button>
+  );
+}
