@@ -6,11 +6,11 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
   const start = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      alert("Ei browser e voice cholbe na, Chrome e khol");
+      alert("Voice is not supported in this browser, please open in Chrome");
       return;
     }
     const rec = new SR();
-    rec.lang = "bn-IN";
+    rec.lang = "en-IN";
     rec.onstart = () => setListening(true);
     rec.onresult = (e: any) => {
       const text = e.results[0][0].transcript;
@@ -18,6 +18,7 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
       setListening(false);
     };
     rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
     rec.start();
   };
 
@@ -25,10 +26,10 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
     <button
       type="button"
       onClick={start}
-      title="Voice diye bolo"
+      title="Speak"
       style={{ padding: "8px 10px", borderRadius: "12px", border: "1px solid #ddd", cursor: "pointer", background: listening ? "#ffe0e0" : "white" }}
     >
-      {listening ? "🎤 Shunchi..." : "🎤"}
+      {listening ? "🎤 Listening..." : "🎤"}
     </button>
   );
 }
