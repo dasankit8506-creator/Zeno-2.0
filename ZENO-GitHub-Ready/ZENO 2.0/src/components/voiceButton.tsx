@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function VoiceButton({ onText }: { onText: (text: string) => void }) {
+export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: string) => void }) {
   const [listening, setListening] = useState(false);
 
   const start = () => {
@@ -14,7 +14,7 @@ export default function VoiceButton({ onText }: { onText: (text: string) => void
     rec.onstart = () => setListening(true);
     rec.onresult = (e: any) => {
       const text = e.results[0][0].transcript;
-      onText(text);
+      onVoiceSend(text);
       setListening(false);
     };
     rec.onerror = () => setListening(false);
@@ -23,10 +23,12 @@ export default function VoiceButton({ onText }: { onText: (text: string) => void
 
   return (
     <button
+      type="button"
       onClick={start}
-      style={{ padding: "10px 16px", borderRadius: "20px", cursor: "pointer" }}
+      title="Voice diye bolo"
+      style={{ padding: "8px 10px", borderRadius: "12px", border: "1px solid #ddd", cursor: "pointer", background: listening ? "#ffe0e0" : "white" }}
     >
-      {listening ? "🎤 Shunchi..." : "🎤 Bolo"}
+      {listening ? "🎤 Shunchi..." : "🎤"}
     </button>
   );
 }
