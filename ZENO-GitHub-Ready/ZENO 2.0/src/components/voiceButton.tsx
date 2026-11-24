@@ -1,26 +1,27 @@
 import { useState, useRef } from "react";
 
-const LANGUAGES = [
-  { code: "en-IN", label: "English" },
-  { code: "bn-IN", label: "Bangla" },
-  { code: "hi-IN", label: "Hindi" },
-  { code: "en-US", label: "English (US)" },
-  { code: "es-ES", label: "Spanish" },
-  { code: "fr-FR", label: "French" },
-  { code: "de-DE", label: "German" },
-  { code: "ja-JP", label: "Japanese" },
-  { code: "ko-KR", label: "Korean" },
-];
-
 export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: string) => void }) {
   const [listening, setListening] = useState(false);
-  const [lang, setLang] = useState("en-IN");
-  const recRef = useRef<any>(null);
+  const recsRef = useRef<any[]>([]);
   const finalTextRef = useRef("");
+  const stoppedRef = useRef(false);
+  const detectedLangRef = useRef("");
+
+  const stopAll = () => {
+    stoppedRef.current = true;
+    recsRef.current.forEach((r) => {
+      try { r.stop(); } catch {}
+    });
+    recsRef.current = [];
+  };
 
   const start = () => {
-    if (listening && recRef.current) {
-      recRef.current.stop();
+    if (listening) {
+      stopAll();
+      setListening(false);
+      const fullText = finalTextRef.current.trim();
+      if (fullText) onVoiceSend(fullText);
+      finalTextRef.current = "";
       return;
     }
 
@@ -30,71 +31,77 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
       return;
     }
 
-    const rec = new SR();
-    recRef.current = rec;
+    stoppedRef.current = false;
     finalTextRef.current = "";
+    detectedLangRef.current = "";
+    recsRef.current = [];
+    setListening(true);
 
-    rec.lang = lang;
-    rec.continuous = true;
-    rec.interimResults = true;
+    // Auto Detect - 3 ta vasha ek sathe sunbe
+    const langs = ["en-IN", "bn-IN", "hi-IN"];
 
-    rec.onstart = () => setListening(true);
+    langs.forEach((langCode) => {
+      const rec = new SR();
+      rec.lang = langCode;
+      rec.continuous = true;
+      rec.interimResults = true;
 
-    rec.onresult = (e: any) => {
-      let finalText = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          finalText += e.results[i][0].transcript;
+      rec.onresult = (e: any) => {
+        let finalText = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalText += e.results[i][0].transcript;
+          }
         }
-      }
-      if (finalText) {
-        finalTextRef.current += finalText + " ";
-      }
-    };
+        // Je vasha age dhorte parbe, oitai lock hoye jabe
+        if (finalText && !detectedLangRef.current) {
+          detectedLangRef.current = langCode;
+          // Baki 2 to mic bondho kore de, jate gondogol na hoy
+          recsRef.current.forEach((r) => {
+            if (r !== rec) {
+              try { r.stop(); } catch {}
+            }
+          });
+        }
+        if (finalText) {
+          // Sudhu je vasha ta detect hoyeche, tar ta nibo
+          if (!detectedLangRef.current || detectedLangRef.current === langCode) {
+            finalTextRef.current += finalText + " ";
+          }
+        }
+      };
 
-    rec.onend = () => {
-      setListening(false);
-      const fullText = finalTextRef.current.trim();
-      if (fullText) {
-        onVoiceSend(fullText);
-      }
-      finalTextRef.current = "";
-    };
+      rec.onerror = () => {};
+      rec.onend = () => {
+        // Jodi nije theke bondho hoye jay ar amra stop korini, tahole abar chalu koro
+        if (!stoppedRef.current && detectedLangRef.current === langCode) {
+          try { rec.start(); } catch {}
+        }
+      };
 
-    rec.onerror = () => setListening(false);
-    rec.start();
+      try {
+        rec.start();
+        recsRef.current.push(rec);
+      } catch {}
+    });
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-      <select
-        value={lang}
-        onChange={(e) => setLang(e.target.value)}
-        disabled={listening}
-        title="Voice Language"
-        style={{ padding: "7px 4px", borderRadius: "10px", border: "1px solid #ddd", fontSize: "12px", cursor: "pointer", background: "white", maxWidth: "85px" }}
-      >
-        {LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>{l.label}</option>
-        ))}
-      </select>
-
-      <button
-        type="button"
-        onClick={start}
-        title={listening ? "Tap to Stop" : "Tap to Speak"}
-        style={{ 
-          padding: "8px 10px", 
-          borderRadius: "12px", 
-          border: "1px solid #ddd", 
-          cursor: "pointer", 
-          background: listening ? "#ff4d4d" : "white",
-          color: listening ? "white" : "black",
-          fontWeight: listening ? "bold" : "normal"
-        }}
-      >
-        {listening ? "⏹️ Stop" : "🎤"}
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={start}
+      title={listening ? "Tap to Stop" : "Tap to Speak - Auto Language"}
+      style={{ 
+        padding: "8px 10px", 
+        borderRadius: "12px", 
+        border: "1px solid #ddd", 
+        cursor: "pointer", 
+        background: listening ? "#ff4d4d" : "white",
+        color: listening ? "white" : "black",
+        fontWeight: listening ? "bold" : "normal"
+      }}
+    >
+      {listening ? "⏹️ Stop" : "🎤 Auto"}
+    </button>
   );
 }
