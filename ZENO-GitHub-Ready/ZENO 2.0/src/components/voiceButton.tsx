@@ -2,26 +2,15 @@ import { useState, useRef } from "react";
 
 export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: string) => void }) {
   const [listening, setListening] = useState(false);
-  const recsRef = useRef<any[]>([]);
+  const recRef = useRef<any>(null);
   const finalTextRef = useRef("");
-  const stoppedRef = useRef(false);
-  const detectedLangRef = useRef("");
-
-  const stopAll = () => {
-    stoppedRef.current = true;
-    recsRef.current.forEach((r) => {
-      try { r.stop(); } catch {}
-    });
-    recsRef.current = [];
-  };
+  const isListeningRef = useRef(false);
 
   const start = () => {
-    if (listening) {
-      stopAll();
-      setListening(false);
-      const fullText = finalTextRef.current.trim();
-      if (fullText) onVoiceSend(fullText);
-      finalTextRef.current = "";
+    // Jodi cholche, tahole STOP
+    if (isListeningRef.current && recRef.current) {
+      isListeningRef.current = false;
+      try { recRef.current.stop(); } catch {}
       return;
     }
 
@@ -31,66 +20,69 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
       return;
     }
 
-    stoppedRef.current = false;
+    const rec = new SR();
+    recRef.current = rec;
     finalTextRef.current = "";
-    detectedLangRef.current = "";
-    recsRef.current = [];
-    setListening(true);
+    isListeningRef.current = true;
 
-    // Auto Detect - 3 ta vasha ek sathe sunbe
-    const langs = ["en-IN", "bn-IN", "hi-IN"];
+    // AUTO - Browser er default vasha, tui jeta bolbi oitai dhorar chesta korbe
+    rec.lang = "";
+    rec.continuous = true;
+    rec.interimResults = true;
 
-    langs.forEach((langCode) => {
-      const rec = new SR();
-      rec.lang = langCode;
-      rec.continuous = true;
-      rec.interimResults = true;
+    rec.onstart = () => {
+      setListening(true);
+      console.log("Mic started");
+    };
 
-      rec.onresult = (e: any) => {
-        let finalText = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) {
-            finalText += e.results[i][0].transcript;
-          }
+    rec.onresult = (e: any) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          const text = e.results[i][0].transcript;
+          console.log("Heard:", text);
+          finalTextRef.current += text + " ";
         }
-        // Je vasha age dhorte parbe, oitai lock hoye jabe
-        if (finalText && !detectedLangRef.current) {
-          detectedLangRef.current = langCode;
-          // Baki 2 to mic bondho kore de, jate gondogol na hoy
-          recsRef.current.forEach((r) => {
-            if (r !== rec) {
-              try { r.stop(); } catch {}
-            }
-          });
-        }
-        if (finalText) {
-          // Sudhu je vasha ta detect hoyeche, tar ta nibo
-          if (!detectedLangRef.current || detectedLangRef.current === langCode) {
-            finalTextRef.current += finalText + " ";
-          }
-        }
-      };
+      }
+    };
 
-      rec.onerror = () => {};
-      rec.onend = () => {
-        // Jodi nije theke bondho hoye jay ar amra stop korini, tahole abar chalu koro
-        if (!stoppedRef.current && detectedLangRef.current === langCode) {
-          try { rec.start(); } catch {}
-        }
-      };
+    rec.onerror = (e: any) => {
+      console.log("Mic error:", e.error);
+      if (e.error === "not-allowed") {
+        alert("Please allow Mic permission in Chrome");
+        isListeningRef.current = false;
+        setListening(false);
+      }
+    };
 
-      try {
-        rec.start();
-        recsRef.current.push(rec);
-      } catch {}
-    });
+    rec.onend = () => {
+      // Jodi tui nije Stop na kore thakis, tahole abar chalu hobe (thamleo off hobe na)
+      if (isListeningRef.current) {
+        try { rec.start(); } catch {}
+        return;
+      }
+      setListening(false);
+      const fullText = finalTextRef.current.trim();
+      console.log("Final text:", fullText);
+      if (fullText) {
+        onVoiceSend(fullText);
+      }
+      finalTextRef.current = "";
+    };
+
+    try {
+      rec.start();
+    } catch (err) {
+      console.log(err);
+      isListeningRef.current = false;
+      setListening(false);
+    }
   };
 
   return (
     <button
       type="button"
       onClick={start}
-      title={listening ? "Tap to Stop" : "Tap to Speak - Auto Language"}
+      title={listening ? "Tap to Stop" : "Tap to Speak"}
       style={{ 
         padding: "8px 10px", 
         borderRadius: "12px", 
@@ -101,7 +93,7 @@ export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: strin
         fontWeight: listening ? "bold" : "normal"
       }}
     >
-      {listening ? "⏹️ Stop" : "🎤 Auto"}
+      {listening ? "⏹️ Stop" : "🎤"}
     </button>
   );
 }
