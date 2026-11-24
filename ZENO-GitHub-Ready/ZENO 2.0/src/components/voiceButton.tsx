@@ -1,99 +1,108 @@
 import { useState, useRef } from "react";
 
 export default function VoiceButton({ onVoiceSend }: { onVoiceSend: (text: string) => void }) {
-  const [listening, setListening] = useState(false);
-  const recRef = useRef<any>(null);
-  const finalTextRef = useRef("");
-  const isListeningRef = useRef(false);
+  const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const mediaRecorderRef = useRef<any>(null);
+  const chunksRef = useRef<any[]>([]);
 
-  const start = () => {
-    // Jodi cholche, tahole STOP
-    if (isListeningRef.current && recRef.current) {
-      isListeningRef.current = false;
-      try { recRef.current.stop(); } catch {}
-      return;
-    }
-
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      alert("Voice is not supported in this browser, please open in Chrome");
-      return;
-    }
-
-    const rec = new SR();
-    recRef.current = rec;
-    finalTextRef.current = "";
-    isListeningRef.current = true;
-
-    // AUTO - Browser er default vasha, tui jeta bolbi oitai dhorar chesta korbe
-    rec.lang = "";
-    rec.continuous = true;
-    rec.interimResults = true;
-
-    rec.onstart = () => {
-      setListening(true);
-      console.log("Mic started");
-    };
-
-    rec.onresult = (e: any) => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) {
-          const text = e.results[i][0].transcript;
-          console.log("Heard:", text);
-          finalTextRef.current += text + " ";
-        }
-      }
-    };
-
-    rec.onerror = (e: any) => {
-      console.log("Mic error:", e.error);
-      if (e.error === "not-allowed") {
-        alert("Please allow Mic permission in Chrome");
-        isListeningRef.current = false;
-        setListening(false);
-      }
-    };
-
-    rec.onend = () => {
-      // Jodi tui nije Stop na kore thakis, tahole abar chalu hobe (thamleo off hobe na)
-      if (isListeningRef.current) {
-        try { rec.start(); } catch {}
-        return;
-      }
-      setListening(false);
-      const fullText = finalTextRef.current.trim();
-      console.log("Final text:", fullText);
-      if (fullText) {
-        onVoiceSend(fullText);
-      }
-      finalTextRef.current = "";
-    };
-
+  const startRecording = async () => {
     try {
-      rec.start();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = recorder;
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e: any) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await transcribe(blob);
+      };
+
+      recorder.start();
+      setRecording(true);
+    } catch {
+      alert("Please allow Mic permission in Chrome");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      setProcessing(true);
+    }
+  };
+
+  const transcribe = async (blob: Blob) => {
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "";
+      
+      // Audio ke Base64 banano
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.readAsDataURL(blob);
+      });
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: "Transcribe exactly what is spoken in this audio. Keep the original language mix as it is - if user speaks Bangla + English mixed, Hinglish, Hindi + English mixed, keep it mixed. Do NOT translate to English. Only return the transcription, nothing else." },
+              { inlineData: { mimeType: "audio/webm", data: base64 } }
+            ]
+          }]
+        }),
+      });
+
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      
+      setProcessing(false);
+      if (text) {
+        onVoiceSend(text);
+      } else {
+        alert("Could not hear, please try again");
+      }
     } catch (err) {
       console.log(err);
-      isListeningRef.current = false;
-      setListening(false);
+      setProcessing(false);
+      alert("Voice failed, please try again");
     }
+  };
+
+  const handleClick = () => {
+    if (processing) return;
+    if (recording) stopRecording();
+    else startRecording();
   };
 
   return (
     <button
       type="button"
-      onClick={start}
-      title={listening ? "Tap to Stop" : "Tap to Speak"}
+      onClick={handleClick}
+      title={recording ? "Tap to Stop" : "Tap to Speak - Any Language"}
       style={{ 
         padding: "8px 10px", 
         borderRadius: "12px", 
         border: "1px solid #ddd", 
         cursor: "pointer", 
-        background: listening ? "#ff4d4d" : "white",
-        color: listening ? "white" : "black",
-        fontWeight: listening ? "bold" : "normal"
+        background: recording ? "#ff4d4d" : processing ? "#ffeaa7" : "white",
+        color: recording ? "white" : "black",
+        fontWeight: recording ? "bold" : "normal"
       }}
     >
-      {listening ? "⏹️ Stop" : "🎤"}
+      {recording ? "⏹️ Stop" : processing ? "⏳..." : "🎤"}
     </button>
   );
 }
