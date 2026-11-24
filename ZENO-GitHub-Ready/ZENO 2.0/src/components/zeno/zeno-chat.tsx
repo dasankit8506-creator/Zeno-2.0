@@ -49,6 +49,7 @@ import type {
 } from "@/lib/zeno/types";
 
 import { cn } from "@/lib/utils";
+import VoiceButton from "@/components/voiceButton";
 
 // ============================================================
 // TYPES
@@ -201,9 +202,6 @@ function getErrorMessage(error: unknown): string {
   return "An unexpected connection error occurred.";
 }
 
-// Convert the image data URL supplied by PromptInput
-// into the image format expected by the Gemini backend.
-
 function parseImageAttachment(file: {
   mediaType?: string;
   url?: string;
@@ -249,10 +247,6 @@ export function ZenoChat() {
 
   const busy = status === "submitted";
 
-  // ----------------------------------------------------------
-  // RESTORE SAVED CONVERSATIONS
-  // ----------------------------------------------------------
-
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -286,10 +280,6 @@ export function ZenoChat() {
     setHydrated(true);
   }, []);
 
-  // ----------------------------------------------------------
-  // SAVE CONVERSATIONS IN BROWSER STORAGE
-  // ----------------------------------------------------------
-
   useEffect(() => {
     if (!hydrated) {
       return;
@@ -307,10 +297,6 @@ export function ZenoChat() {
       );
     }
   }, [savedChats, hydrated]);
-
-  // ----------------------------------------------------------
-  // AUTOMATICALLY SAVE ACTIVE CONVERSATION CHANGES
-  // ----------------------------------------------------------
 
   useEffect(() => {
     if (
@@ -343,10 +329,6 @@ export function ZenoChat() {
         .slice(0, MAX_SAVED_CHATS);
     });
   }, [messages, activeChatId, hydrated]);
-
-  // ----------------------------------------------------------
-  // SEND MESSAGE TO GEMINI
-  // ----------------------------------------------------------
 
   const handleSend = async (
     displayText: string,
@@ -438,10 +420,6 @@ export function ZenoChat() {
     }
   };
 
-  // ----------------------------------------------------------
-  // NEW CHAT
-  // ----------------------------------------------------------
-
   const handleNewChat = () => {
     if (sendingRef.current) {
       return;
@@ -453,10 +431,6 @@ export function ZenoChat() {
     setCameraOpen(false);
   };
 
-  // ----------------------------------------------------------
-  // OPEN SAVED CHAT
-  // ----------------------------------------------------------
-
   const handleOpenChat = (chat: SavedChat) => {
     if (sendingRef.current) {
       return;
@@ -466,10 +440,6 @@ export function ZenoChat() {
     setMessages(chat.messages);
     setErrorNotice("");
   };
-
-  // ----------------------------------------------------------
-  // DELETE SAVED CHAT
-  // ----------------------------------------------------------
 
   const handleDeleteChat = (chatId: string) => {
     if (sendingRef.current) {
@@ -486,14 +456,8 @@ export function ZenoChat() {
     }
   };
 
-  // ==========================================================
-  // UI
-  // ==========================================================
-
   return (
     <div className="flex h-dvh flex-col bg-background">
-
-      {/* HEADER */}
 
       <header className="flex items-center justify-between gap-3 border-b bg-background/80 px-4 py-3 backdrop-blur md:px-8">
 
@@ -514,8 +478,6 @@ export function ZenoChat() {
         </div>
 
         <div className="flex items-center gap-2">
-
-          {/* CHAT HISTORY */}
 
           <details className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium text-foreground hover:bg-accent">
@@ -569,8 +531,6 @@ export function ZenoChat() {
             </div>
           </details>
 
-          {/* NEW CHAT BUTTON */}
-
           <Button
             variant="outline"
             size="sm"
@@ -586,8 +546,6 @@ export function ZenoChat() {
 
         </div>
       </header>
-
-      {/* CHAT AREA */}
 
       <Conversation className="zeno-scroll">
 
@@ -612,8 +570,6 @@ export function ZenoChat() {
                     Understand. Adapt. Improve.
                   </p>
                 </div>
-
-                {/* SUGGESTED PROMPTS */}
 
                 <div className="mt-2 grid w-full max-w-xl gap-3 sm:grid-cols-3">
                   {SUGGESTED_PROMPTS.map((item) => (
@@ -665,8 +621,6 @@ export function ZenoChat() {
               ),
             )}
 
-            {/* THINKING INDICATOR */}
-
             {busy && (
               <div className="text-sm text-muted-foreground">
                 <Shimmer className="font-display">
@@ -682,8 +636,6 @@ export function ZenoChat() {
 
       </Conversation>
 
-      {/* VISIBLE ERROR */}
-
       {errorNotice && (
         <div
           role="alert"
@@ -692,8 +644,6 @@ export function ZenoChat() {
           ZENO error: {errorNotice}
         </div>
       )}
-
-      {/* MESSAGE INPUT */}
 
       <div className="border-t bg-card/40 px-4 pb-4 pt-3 md:px-8">
         <div className="mx-auto w-full max-w-3xl">
@@ -724,26 +674,18 @@ export function ZenoChat() {
             className="rounded-2xl border-border bg-card shadow-sm"
           >
 
-            {/* CAMERA PREVIEW */}
-
             {cameraOpen && (
               <CameraCapturePanel
                 onClose={() => setCameraOpen(false)}
               />
             )}
 
-            {/* SELECTED IMAGE PREVIEW */}
-
             <ComposerAttachmentPreview />
-
-            {/* TEXT INPUT */}
 
             <PromptInputTextarea
               placeholder="Ask ZENO anything…"
               className="min-h-14 resize-none border-none bg-transparent text-sm focus-visible:ring-0"
             />
-
-            {/* INPUT FOOTER */}
 
             <PromptInputFooter className="justify-between">
 
@@ -754,11 +696,14 @@ export function ZenoChat() {
                 }}
               />
 
-              <PromptInputSubmit
-                status={status}
-                disabled={busy}
-                className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-              />
+              <div className="flex items-center gap-2">
+                <VoiceButton onVoiceSend={(text) => handleSend(text)} />
+                <PromptInputSubmit
+                  status={status}
+                  disabled={busy}
+                  className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                />
+              </div>
 
             </PromptInputFooter>
           </PromptInput>
@@ -814,8 +759,6 @@ function AssistantMessage({
 
       </ChatMessageContent>
 
-      {/* ADAPTIVE ACTIONS */}
-
       <div
         className={cn(
           "mt-1 flex flex-wrap gap-2",
@@ -856,8 +799,6 @@ function ComposerTools({
   return (
     <div className="flex items-center gap-1">
 
-      {/* IMAGE UPLOAD */}
-
       <PromptInputButton
         tooltip="Attach an image"
         onClick={openFileDialog}
@@ -865,8 +806,6 @@ function ComposerTools({
       >
         <ImagePlusIcon className="size-4" />
       </PromptInputButton>
-
-      {/* CAMERA */}
 
       <PromptInputButton
         tooltip="Take a photo with your camera"
@@ -948,10 +887,6 @@ function CameraCapturePanel({
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
 
-  // ----------------------------------------------------------
-  // START CAMERA
-  // ----------------------------------------------------------
-
   useEffect(() => {
     let cancelled = false;
     let stream: MediaStream | null = null;
@@ -1015,10 +950,6 @@ function CameraCapturePanel({
         .forEach((track) => track.stop());
     };
   }, []);
-
-  // ----------------------------------------------------------
-  // CAPTURE PHOTO
-  // ----------------------------------------------------------
 
   const capturePhoto = () => {
     const video = videoRef.current;
@@ -1085,10 +1016,6 @@ function CameraCapturePanel({
     );
   };
 
-  // ----------------------------------------------------------
-  // CAMERA UI
-  // ----------------------------------------------------------
-
   return (
     <div className="space-y-3 border-b p-3">
 
@@ -1139,5 +1066,3 @@ function CameraCapturePanel({
     </div>
   );
 }
-
-
